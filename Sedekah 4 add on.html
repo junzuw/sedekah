@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/3771/3771278.png">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3771/3771278.png">
+
+    <title>Donasi Tracker</title>
+    
+    <style>
+        :root {
+            --primary: #2563eb;
+            --success: #059669;
+            --bg: #f1f5f9;
+            --text-dark: #1e293b;
+        }
+
+        * { 
+            box-sizing: border-box; 
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body { 
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: var(--bg); 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; /* Memastikan konten di tengah vertikal */
+            padding: 20px;
+        }
+
+        .card { 
+            background: white; 
+            padding: 30px 20px; 
+            border-radius: 28px; 
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); 
+            width: 100%; 
+            max-width: 360px; 
+            text-align: center;
+        }
+
+        h2 { 
+            color: var(--text-dark); 
+            margin: 0 0 20px 0; 
+            font-size: 1.4rem;
+            letter-spacing: -0.5px;
+        }
+        
+        .date-picker { margin-bottom: 20px; }
+        input[type="date"] { 
+            padding: 12px; 
+            border-radius: 12px; 
+            border: 2px solid #e2e8f0; 
+            width: 100%; 
+            font-size: 1rem;
+            font-family: inherit;
+            outline: none;
+            text-align: center;
+            color: var(--text-dark);
+        }
+
+        .status-box { 
+            background: #f8fafc; 
+            padding: 25px 15px; 
+            border-radius: 20px; 
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            border: 2px solid #e2e8f0;
+            margin-bottom: 20px;
+        }
+
+        .status-box.completed { 
+            background: #ecfdf5; 
+            border-color: var(--success); 
+            transform: scale(1.02);
+        }
+
+        .day-info { 
+            font-size: 0.75rem; 
+            font-weight: 700; 
+            color: #64748b; 
+            text-transform: uppercase; 
+            letter-spacing: 1.5px;
+            margin-bottom: 8px;
+        }
+
+        .target-name { 
+            font-size: 2rem; 
+            font-weight: 800; 
+            color: var(--text-dark); 
+            margin: 5px 0; 
+            display: block; 
+        }
+        
+        #statusText {
+            font-size: 0.9rem;
+            margin-top: 10px;
+            color: #475569;
+        }
+
+        .btn-done {
+            background: var(--primary); 
+            color: white; 
+            border: none; 
+            padding: 18px;
+            border-radius: 16px; 
+            width: 100%; 
+            font-size: 1.1rem; 
+            font-weight: 700;
+            cursor: pointer; 
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+            transition: all 0.2s;
+        }
+
+        .btn-done:active { transform: scale(0.96); }
+
+        .btn-done.completed { 
+            background: var(--success); 
+            box-shadow: 0 4px 14px rgba(5, 150, 105, 0.3);
+        }
+        
+        .reset-btn { 
+            margin-top: 25px; 
+            background: none; 
+            border: none; 
+            color: #94a3b8; 
+            font-size: 0.75rem; 
+            cursor: pointer; 
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Tracker Donasi Harian</h2>
+    
+    <div class="date-picker">
+        <input type="date" id="donationDate" onchange="renderApp()">
+    </div>
+
+    <div id="statusBox" class="status-box">
+        <div id="dayLabel" class="day-info">MEMUAT...</div>
+        <span id="targetLabel" class="target-name">-</span>
+        <div id="statusText">Status: Belum Dilakukan</div>
+    </div>
+
+    <button id="btnAction" class="btn-done" onclick="toggleStatus()">SAYA SUDAH DONASI</button>
+
+    <button class="reset-btn" onclick="resetData()">Hapus Riwayat Memori</button>
+</div>
+
+<script>
+    // Set default tanggal hari ini
+    document.getElementById('donationDate').valueAsDate = new Date();
+
+      // Registrasi Service Worker untuk PWA
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('SW Registered'))
+                .catch(err => console.log('SW Registration Failed'));
+        });
+    }
+
+    function renderApp() {
+        const dateInput = document.getElementById('donationDate').value;
+        const targetLabel = document.getElementById('targetLabel');
+        const dayLabel = document.getElementById('dayLabel');
+        const statusBox = document.getElementById('statusBox');
+        const statusText = document.getElementById('statusText');
+        const btnAction = document.getElementById('btnAction');
+
+        // Logika Siklus 6 Hari
+        // Menggunakan patokan 1 Januari 2024 sebagai Hari Ke-1
+        const startDate = new Date('2024-01-01');
+        const currentDate = new Date(dateInput);
+        const diffTime = currentDate - startDate;
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        
+        // Rumus Modulo untuk siklus berulang 6 hari
+        const hariKe = ((diffDays % 6) + 6) % 6 + 1;
+
+        let target = "";
+        if (hariKe >= 1 && hariKe <= 3) {
+            target = "A & B";
+        } else if (hariKe === 4) {
+            target = "A & C";
+        } else if (hariKe === 5) {
+            target = "A & D, E";
+        } else if (hariKe === 6) {
+            target = "A & F, G";
+        }
+
+        dayLabel.innerText = `SIKLUS: HARI KE-${hariKe}`;
+        targetLabel.innerText = target;
+
+        // Cek riwayat di memori HP
+        const isDone = localStorage.getItem('donasi_' + dateInput);
+
+        if (isDone) {
+            statusBox.classList.add('completed');
+            statusText.innerHTML = "Status: ✅ <b>SUDAH SELESAI</b>";
+            btnAction.innerText = "BATALKAN STATUS";
+            btnAction.classList.add('completed');
+        } else {
+            statusBox.classList.remove('completed');
+            statusText.innerHTML = "Status: ❌ <b>BELUM DILAKUKAN</b>";
+            btnAction.innerText = "SAYA SUDAH DONASI";
+            btnAction.classList.remove('completed');
+        }
+    }
+
+    function toggleStatus() {
+        const dateInput = document.getElementById('donationDate').value;
+        if (!dateInput) return;
+        
+        const isDone = localStorage.getItem('donasi_' + dateInput);
+        if (isDone) {
+            localStorage.removeItem('donasi_' + dateInput);
+        } else {
+            localStorage.setItem('donasi_' + dateInput, 'true');
+        }
+        renderApp();
+    }
+
+    function resetData() {
+        if(confirm("Hapus semua riwayat donasi dari memori aplikasi?")) {
+            localStorage.clear();
+            renderApp();
+        }
+    }
+
+    // Jalankan aplikasi saat pertama kali dibuka
+    renderApp();
+</script>
+
+</body>
+</html>
